@@ -1,0 +1,38 @@
+#!/usr/bin/with-contenv bash
+set -euo pipefail
+
+DB_PATH="/app/data/matchbook.sqlite"
+MIGRATIONS_DIR="/app/migrations"
+
+mkdir -p "$(dirname "$DB_PATH")"
+chown -R abc:abc /app/data
+
+if ! command -v sqlite3 >/dev/null 2>&1; then
+  echo "sqlite3 is not installed; skipping database setup."
+  exit 0
+fi
+
+sqlite3 "$DB_PATH" "PRAGMA journal_mode=WAL;"
+sqlite3 "$DB_PATH" "CREATE TABLE IF NOT EXISTS schema_migrations (version TEXT PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT (datetime('now')));"
+
+if [ -d "$MIGRATIONS_DIR" ]; then
+  for file in "$MIGRATIONS_DIR"/*.sql; do
+    [ -e "$file" ] || continue
+    version="$(basename "$file" .sql)"
+    applied="$(sqlite3 "$DB_PATH" "SELECT 1 FROM schema_migrations WHERE version='$version' LIMIT 1;")"
+    if [ -z "$applied" ]; then
+      tmpfile="$(mktemp /tmp/migration.XXXXXX.sql)"
+      {
+        echo "BEGIN;"
+        cat "$file"
+        echo "INSERT INTO schema_migrations(version) VALUES('$version');"
+        echo "COMMIT;"
+      } > "$tmpfile"
+      sqlite3 "$DB_PATH" < "$tmpfile"
+      rm -f "$tmpfile"
+      echo "Applied migration $version"
+    fi
+  done
+fi
+
+chown abc:abc "$DB_PATH"

@@ -1,0 +1,7 @@
+#!/usr/bin/with-contenv bash
+set -e
+
+mkdir -p /run
+chown abc:abc /run
+
+exec php-fpm82 -F
