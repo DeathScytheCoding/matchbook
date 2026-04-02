@@ -1,0 +1,5 @@
+#!/usr/bin/with-contenv bash
+set -e
+
+mkdir -p /app/uploads /app/data /app/config
+chown -R abc:abc /app/uploads /app/data /app/config /app/www
